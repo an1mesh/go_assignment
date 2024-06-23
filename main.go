@@ -78,7 +78,7 @@ func main() {
 				isFound = true
 			}
 		}
-		if isFound == false {
+		if !isFound {
 			chances -= 1
 		}
 	}
