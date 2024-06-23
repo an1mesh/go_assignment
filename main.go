@@ -1,13 +1,49 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
 	"strings"
 )
 
+func getWord() string {
+
+	// GET call
+	response, err := http.Get("https://random-word-api.herokuapp.com/word")
+	if err != nil {
+		panic(err)
+	}
+
+	// close the body
+	defer response.Body.Close()
+
+	// read the body of response it gives array of bytes
+	responseBody, err := io.ReadAll(response.Body)
+	if err != nil {
+		panic(err)
+	}
+	fmt.Printf("%s", responseBody)
+
+	// empty slice of string
+	words := []string{}
+
+	// Unmarshalling json
+	err = json.Unmarshal(responseBody, &words)
+
+	fmt.Println(words)
+
+	if err != nil {
+		panic(err)
+	}
+
+	return words[0]
+}
+
 func main() {
 
-	word := "panda"
+	word := getWord()
 
 	// Look for entries made by the user.(Input is taken and type is inferred using :=)
 	entries := map[string]bool{}
@@ -16,7 +52,7 @@ func main() {
 	placeholder := []string{}
 
 	// No. of chances a user gets
-	chances := 5
+	chances := len(word)
 
 	// Loop to add guessed word in placeholder slice.
 	for i := 0; i < len(word); i++ {
@@ -26,11 +62,13 @@ func main() {
 		// If user enters a wrong letter or the wrong word, they lose a chance.
 		userInput := strings.Join(placeholder, "")
 		if chances == 0 && userInput != word {
+			fmt.Println("The word was", word)
 			fmt.Println("game over, try again")
 			break
 		}
 		// User won
 		if userInput == word {
+			fmt.Println("The word was", word)
 			fmt.Println("you win")
 			break
 		}
