@@ -2,13 +2,21 @@ package main
 
 import (
 	"encoding/json"
+	"flag"
 	"fmt"
 	"io"
 	"net/http"
 	"strings"
+	"time"
 )
 
+var dev = flag.Bool("dev", false, "dev mode")
+
 func getWord() string {
+
+	if *dev {
+		return "panda"
+	}
 
 	// GET call
 	response, err := http.Get("https://random-word-api.herokuapp.com/word")
@@ -43,6 +51,8 @@ func getWord() string {
 
 func main() {
 
+	flag.Parse()
+
 	word := getWord()
 
 	// Look for entries made by the user.(Input is taken and type is inferred using :=)
@@ -58,66 +68,88 @@ func main() {
 	for i := 0; i < len(word); i++ {
 		placeholder = append(placeholder, "_")
 	}
-	for {
-		// If user enters a wrong letter or the wrong word, they lose a chance.
-		userInput := strings.Join(placeholder, "")
-		if chances == 0 && userInput != word {
-			fmt.Println("The word was", word)
-			fmt.Println("game over, try again")
-			break
-		}
-		// User won
-		if userInput == word {
-			fmt.Println("The word was", word)
-			fmt.Println("you win")
-			break
-		}
+	t := time.NewTimer(1 * time.Minute)
+	result := make(chan bool)
+	go func() {
+		for {
 
-		fmt.Println("\n")
+			for {
+				// If user enters a wrong letter or the wrong word, they lose a chance.
+				userInput := strings.Join(placeholder, "")
+				if chances == 0 && userInput != word {
+					result <- false
+					fmt.Println("The word was", word)
+					fmt.Println("game over, try again")
+					break
+				}
+				// User won
+				if userInput == word {
+					result <- true
+					fmt.Println("The word was", word)
+					fmt.Println("you win")
+					break
+				}
 
-		// Print placeholder slice
-		fmt.Println(placeholder)
+				fmt.Println("\n")
 
-		// Print the chances left
-		fmt.Printf("chances: %d\n", chances) // render the chances left
+				// Print placeholder slice
+				fmt.Println(placeholder)
 
-		keys := []string{}
-		// If we are not using a variable agian, declare with _
-		for k, _ := range entries {
+				// Print the chances left
+				fmt.Printf("chances: %d\n", chances) // render the chances left
 
-			// appends key of each entry of map entries
-			keys = append(keys, k)
-		}
-		fmt.Println(keys)
-		fmt.Printf("Guess a letter or the word: ")
+				keys := []string{}
+				// If we are not using a variable agian, declare with _
+				for k, _ := range entries {
 
-		// Take input
-		inputStr := ""
-		fmt.Scanln(&inputStr)
-		if len(inputStr) == len(word) && inputStr == word {
-			fmt.Println("you won")
-			break
-		}
+					// appends key of each entry of map entries
+					keys = append(keys, k)
+				}
+				fmt.Println(keys)
+				fmt.Printf("Guess a letter or the word: ")
 
-		// check for duplicates
-		_, duplicate := entries[inputStr]
-		if duplicate {
-			continue
-		}
+				// Take input
+				inputStr := ""
+				fmt.Scanln(&inputStr)
+				if len(inputStr) == len(word) && inputStr == word {
+					result <- true
+					fmt.Println("you won")
+					break
+				}
 
-		// update entries
-		entries[inputStr] = true
+				// check for duplicates
+				_, duplicate := entries[inputStr]
+				if duplicate {
+					continue
+				}
 
-		isFound := false
+				// update entries
+				entries[inputStr] = true
 
-		for i, value := range word {
-			if inputStr == string(value) {
-				placeholder[i] = string(value)
-				isFound = true
+				isFound := false
+
+				for i, value := range word {
+					if inputStr == string(value) {
+						placeholder[i] = string(value)
+						isFound = true
+					}
+				}
+				if !isFound {
+					chances -= 1
+				}
 			}
 		}
-		if !isFound {
-			chances -= 1
+	}()
+	for {
+		select {
+		case <-result:
+			fmt.Println("...")
+			goto END
+		case <-t.C:
+			fmt.Println("Timed out... too bad!")
+			goto END
 		}
 	}
+END:
+	fmt.Println("Better Luck Next Time")
 }
